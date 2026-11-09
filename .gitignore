@@ -89,3 +89,8 @@ dkms.conf
 *.out
 *.app
 
+
+### ESPHome
+.esphome/
+secrets.yaml
+esphome/test/build/

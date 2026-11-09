@@ -1,0 +1,333 @@
+# =====================================================================
+#  Подсветка лестницы — ESPHome
+#  11 ступенек × 24 светодиода WS2812B (5 В), 2 датчика AM312, фоторезистор.
+#  Рядом с этим файлом должен лежать stairs_logic.h
+# =====================================================================
+
+substitutions:
+  name: stairs-led
+  friendly_name: Лестница
+  led_pin: GPIO16        # DATA ленты (через 74AHCT125)
+  pir_bottom_pin: GPIO25 # датчик «начало лестницы» (внизу)
+  pir_top_pin: GPIO26    # датчик «конец лестницы» (наверху)
+  ldr_pin: GPIO34        # фоторезистор (только ADC1: GPIO32–39)
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+  includes:
+    - stairs_logic.h
+  on_boot:
+    priority: -100
+    then:
+      # Внутренняя лента всегда включена, кадры рисует наш движок
+      - light.turn_on:
+          id: strip
+          brightness: 100%
+          effect: Engine
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+logger:
+  level: INFO
+
+api:
+  encryption:
+    key: !secret stairs_api_key
+  # ---- Индикация: вызывается из HA / Node-RED как esphome.stairs_led_notify ----
+  actions:
+    - action: notify
+      variables:
+        pattern: string     # solid, pulse, blink, alarm, run_up, run_down, level, steps
+        r: int
+        g: int
+        b: int
+        brightness: int     # 0..100 %
+        duration: int       # секунд, 0 — пока не остановят
+        value: int          # level: 0..100 %; steps: битовая маска ступенек
+      then:
+        - lambda: 'stairs::notify_start(pattern, r, g, b, brightness, duration, value);'
+    - action: notify_stop
+      then:
+        - lambda: 'stairs::notify_stop();'
+
+ota:
+  - platform: esphome
+    encryption:
+      key: !secret stairs_api_key
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "Stairs-LED Fallback"
+    password: !secret fallback_password
+
+captive_portal:
+
+# ------------------------- Лента -------------------------
+light:
+  # Физическая лента — скрыта от HA, ей управляет движок
+  - platform: esp32_rmt_led_strip
+    id: strip
+    internal: true
+    pin: ${led_pin}
+    num_leds: 264
+    chipset: WS2812
+    channel_colors: GRB
+    restore_mode: ALWAYS_ON
+    default_transition_length: 0s
+    effects:
+      - addressable_lambda:
+          name: Engine
+          update_interval: 20ms
+          lambda: |-
+            auto &v = id(stairs_light).current_values;
+            stairs::cur.enabled = v.is_on();
+            stairs::cur.color = Color(v.get_red() * 255, v.get_green() * 255, v.get_blue() * 255);
+            stairs::cur.bright = v.get_brightness();
+            stairs::cur.auto_motion = id(sw_auto_motion).state;
+            stairs::cur.night = id(sw_night).state;
+            stairs::cur.auto_bright = id(sw_auto_bright).state;
+            stairs::cur.sensor_high = id(pir_bottom).state || id(pir_top).state;
+            stairs::cur.light_pct = isnan(id(ldr_pct).state) ? 0 : id(ldr_pct).state;
+            stairs::cur.dark_threshold = id(num_dark).state;
+            stairs::cur.night_bright = id(num_night_bright).state / 100.0f;
+            stairs::cur.timeout_ms = id(num_timeout).state * 1000;
+            stairs::cur.step_delay_ms = id(num_step_delay).state;
+            stairs::cur.fade_ms = id(num_fade).state;
+            stairs::cur.effect_mode = id(sel_effect).active_index().value_or(0);
+            stairs::render(it);
+
+  # То, что видно в HA: вкл/выкл подсветки, цвет и яркость прохода.
+  # Выходы-«пустышки»: значения читает движок напрямую.
+  - platform: rgb
+    id: stairs_light
+    name: "Подсветка"
+    icon: mdi:stairs
+    red: out_r
+    green: out_g
+    blue: out_b
+    gamma_correct: 1.0
+    default_transition_length: 0s
+    restore_mode: RESTORE_DEFAULT_ON
+
+output:
+  - platform: template
+    id: out_r
+    type: float
+    write_action:
+      - lambda: ''
+  - platform: template
+    id: out_g
+    type: float
+    write_action:
+      - lambda: ''
+  - platform: template
+    id: out_b
+    type: float
+    write_action:
+      - lambda: ''
+
+# ------------------------- Датчики -------------------------
+binary_sensor:
+  - platform: gpio
+    id: pir_bottom
+    name: "Движение внизу"
+    device_class: motion
+    pin:
+      number: ${pir_bottom_pin}
+      mode: INPUT_PULLDOWN
+    on_press:
+      - lambda: |-
+          if (stairs::motion(1)) id(walk_event).trigger("up");
+
+  - platform: gpio
+    id: pir_top
+    name: "Движение наверху"
+    device_class: motion
+    pin:
+      number: ${pir_top_pin}
+      mode: INPUT_PULLDOWN
+    on_press:
+      - lambda: |-
+          if (stairs::motion(-1)) id(walk_event).trigger("down");
+
+  - platform: template
+    name: "Подсветка горит"
+    icon: mdi:stairs-box
+    lambda: 'return stairs::busy();'
+
+  - platform: status
+    name: "Статус"
+
+sensor:
+  - platform: adc
+    id: ldr_raw
+    pin: ${ldr_pin}
+    attenuation: 12db
+    update_interval: 1s
+    internal: true
+    filters:
+      - sliding_window_moving_average:
+          window_size: 5
+          send_every: 3
+    on_value:
+      - sensor.template.publish:
+          id: ldr_pct
+          state: !lambda 'return x / 3.3f * 100.0f;'
+
+  - platform: template
+    id: ldr_pct
+    name: "Освещённость"
+    unit_of_measurement: "%"
+    icon: mdi:brightness-6
+    accuracy_decimals: 0
+    filters:
+      - clamp:
+          min_value: 0
+          max_value: 100
+
+  - platform: wifi_signal
+    name: "Wi-Fi сигнал"
+    update_interval: 60s
+    entity_category: diagnostic
+
+event:
+  - platform: template
+    id: walk_event
+    name: "Проход"
+    icon: mdi:walk
+    event_types:
+      - up
+      - down
+
+text_sensor:
+  - platform: template
+    name: "Индикация"
+    icon: mdi:message-alert
+    update_interval: 1s
+    lambda: 'return stairs::notify_name();'
+
+# ------------------------- Настройки -------------------------
+select:
+  - platform: template
+    id: sel_effect
+    name: "Эффект"
+    icon: mdi:palette
+    optimistic: true
+    restore_value: true
+    options:
+      - "Цвет"
+      - "Радуга"
+      - "Огонь"
+      - "По очереди"
+    initial_option: "По очереди"
+
+switch:
+  - platform: template
+    id: sw_auto_motion
+    name: "Включать по движению"
+    icon: mdi:motion-sensor
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+  - platform: template
+    id: sw_night
+    name: "Ночная подсветка"
+    icon: mdi:weather-night
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+  - platform: template
+    id: sw_auto_bright
+    name: "Автояркость"
+    icon: mdi:brightness-auto
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+    entity_category: config
+
+number:
+  - platform: template
+    id: num_timeout
+    name: "Таймаут"
+    icon: mdi:timer-outline
+    unit_of_measurement: s
+    min_value: 5
+    max_value: 120
+    step: 1
+    initial_value: 15
+    optimistic: true
+    restore_value: true
+    entity_category: config
+  - platform: template
+    id: num_dark
+    name: "Порог темноты"
+    icon: mdi:theme-light-dark
+    unit_of_measurement: "%"
+    min_value: 0
+    max_value: 100
+    step: 1
+    initial_value: 50
+    optimistic: true
+    restore_value: true
+    entity_category: config
+  - platform: template
+    id: num_night_bright
+    name: "Яркость ночной подсветки"
+    icon: mdi:brightness-4
+    unit_of_measurement: "%"
+    min_value: 1
+    max_value: 100
+    step: 1
+    initial_value: 50
+    optimistic: true
+    restore_value: true
+    entity_category: config
+  - platform: template
+    id: num_step_delay
+    name: "Шаг волны"
+    icon: mdi:stairs-up
+    unit_of_measurement: ms
+    min_value: 20
+    max_value: 600
+    step: 10
+    initial_value: 150
+    optimistic: true
+    restore_value: true
+    entity_category: config
+  - platform: template
+    id: num_fade
+    name: "Плавность ступеньки"
+    icon: mdi:gradient-horizontal
+    unit_of_measurement: ms
+    min_value: 50
+    max_value: 2000
+    step: 50
+    initial_value: 400
+    optimistic: true
+    restore_value: true
+    entity_category: config
+
+button:
+  - platform: template
+    name: "Тест: проход вверх"
+    icon: mdi:stairs-up
+    entity_category: config
+    on_press:
+      - lambda: 'stairs::motion(1, true);'
+  - platform: template
+    name: "Тест: индикация"
+    icon: mdi:bell-ring
+    entity_category: config
+    on_press:
+      - lambda: 'stairs::notify_start("pulse", 0, 120, 255, 70, 10, 0);'
+  - platform: template
+    name: "Стоп индикации"
+    icon: mdi:bell-off
+    on_press:
+      - lambda: 'stairs::notify_stop();'
+  - platform: restart
+    name: "Перезагрузка"
+    entity_category: diagnostic

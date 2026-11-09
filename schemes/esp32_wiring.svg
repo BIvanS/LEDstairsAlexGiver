@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 620" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="14">
+  <title>Подсветка лестницы — подключение ESP32</title>
+  <rect width="1000" height="620" fill="#ffffff"/>
+  <text x="30" y="40" font-size="22" font-weight="700" fill="#1f2937">Подсветка лестницы — ESP32 + ESPHome</text>
+  <text x="30" y="62" fill="#6b7280">11 ступенек × 24 WS2812B (5 В) · 2 × AM312 · фоторезистор</text>
+
+  <!-- PSU -->
+  <rect x="30" y="100" width="170" height="80" rx="8" fill="#f3f4f6" stroke="#374151" stroke-width="2"/>
+  <text x="115" y="132" text-anchor="middle" font-weight="700" fill="#111827">Блок питания</text>
+  <text x="115" y="154" text-anchor="middle" fill="#374151">5 В, 10 А+</text>
+  <text x="208" y="122" fill="#dc2626" font-weight="700">+5V</text>
+  <text x="208" y="168" fill="#111827" font-weight="700">GND</text>
+
+  <!-- Rails -->
+  <line x1="200" y1="128" x2="960" y2="128" stroke="#dc2626" stroke-width="3"/>
+  <line x1="200" y1="170" x2="960" y2="170" stroke="#111827" stroke-width="3"/>
+  <text x="900" y="120" fill="#dc2626">+5V</text>
+  <text x="900" y="162" fill="#111827">GND</text>
+
+  <!-- ESP32 -->
+  <rect x="300" y="240" width="200" height="300" rx="10" fill="#e0f2fe" stroke="#0369a1" stroke-width="2"/>
+  <text x="400" y="272" text-anchor="middle" font-weight="700" font-size="17" fill="#0c4a6e">ESP32 DevKit</text>
+  <g fill="#0c4a6e">
+    <text x="312" y="310">5V / VIN</text>
+    <text x="312" y="340">GND</text>
+    <text x="312" y="370">3V3</text>
+    <text x="488" y="400" text-anchor="end">GPIO16</text>
+    <text x="488" y="430" text-anchor="end">GPIO25</text>
+    <text x="488" y="460" text-anchor="end">GPIO26</text>
+    <text x="488" y="490" text-anchor="end">GPIO34</text>
+  </g>
+  <!-- ESP power -->
+  <polyline points="300,305 270,305 270,128" fill="none" stroke="#dc2626" stroke-width="2"/>
+  <circle cx="270" cy="128" r="4" fill="#dc2626"/>
+  <polyline points="300,335 250,335 250,170" fill="none" stroke="#111827" stroke-width="2"/>
+  <circle cx="250" cy="170" r="4" fill="#111827"/>
+  <!-- 3V3 rail -->
+  <polyline points="300,365 230,365 230,580 940,580" fill="none" stroke="#ea580c" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="240" y="598" fill="#ea580c">3V3 — питание датчиков и делителя</text>
+
+  <!-- Level shifter -->
+  <rect x="560" y="370" width="150" height="60" rx="6" fill="#fef3c7" stroke="#b45309" stroke-width="2"/>
+  <text x="635" y="395" text-anchor="middle" font-weight="700" fill="#78350f">74AHCT125</text>
+  <text x="635" y="415" text-anchor="middle" font-size="12" fill="#78350f">VCC=5V · 1OE=GND</text>
+  <line x1="500" y1="395" x2="560" y2="395" stroke="#16a34a" stroke-width="2.5"/>
+  <polyline points="635,370 635,128" fill="none" stroke="#dc2626" stroke-width="1.5"/>
+  <circle cx="635" cy="128" r="3.5" fill="#dc2626"/>
+  <polyline points="700,370 700,170" fill="none" stroke="#111827" stroke-width="1.5"/>
+  <circle cx="700" cy="170" r="3.5" fill="#111827"/>
+
+  <!-- Resistor + strip -->
+  <polyline points="710,400 760,400" fill="none" stroke="#16a34a" stroke-width="2.5"/>
+  <rect x="760" y="390" width="40" height="20" fill="#ffffff" stroke="#374151" stroke-width="2"/>
+  <text x="780" y="430" text-anchor="middle" font-size="12" fill="#374151">330 Ом</text>
+  <line x1="800" y1="400" x2="830" y2="400" stroke="#16a34a" stroke-width="2.5"/>
+  <rect x="830" y="215" width="140" height="215" rx="6" fill="#f5f3ff" stroke="#6d28d9" stroke-width="2"/>
+  <text x="900" y="245" text-anchor="middle" font-weight="700" fill="#4c1d95">Лента WS2812B</text>
+  <text x="900" y="267" text-anchor="middle" font-size="12" fill="#4c1d95">264 диода</text>
+  <text x="900" y="285" text-anchor="middle" font-size="12" fill="#4c1d95">ступенька 0 — нижняя</text>
+  <text x="840" y="404" fill="#4c1d95">DIN</text>
+  <text x="840" y="320" fill="#4c1d95">+5V (низ и верх)</text>
+  <text x="840" y="350" fill="#4c1d95">GND</text>
+  <polyline points="950,215 950,128" fill="none" stroke="#dc2626" stroke-width="2"/>
+  <circle cx="950" cy="128" r="4" fill="#dc2626"/>
+  <polyline points="860,215 860,170" fill="none" stroke="#111827" stroke-width="2"/>
+  <circle cx="860" cy="170" r="4" fill="#111827"/>
+
+  <!-- PIR -->
+  <rect x="560" y="455" width="175" height="34" rx="6" fill="#ecfdf5" stroke="#047857" stroke-width="2"/>
+  <text x="647" y="477" text-anchor="middle" fill="#065f46">AM312 — низ (начало)</text>
+  <line x1="500" y1="426" x2="530" y2="426" stroke="#047857" stroke-width="2"/>
+  <polyline points="530,426 530,472 560,472" fill="none" stroke="#047857" stroke-width="2"/>
+  <rect x="560" y="500" width="175" height="34" rx="6" fill="#ecfdf5" stroke="#047857" stroke-width="2"/>
+  <text x="647" y="522" text-anchor="middle" fill="#065f46">AM312 — верх (конец)</text>
+  <polyline points="500,456 520,456 520,517 560,517" fill="none" stroke="#047857" stroke-width="2"/>
+  <text x="745" y="477" font-size="12" fill="#065f46">VCC → 3V3, GND → GND</text>
+  <text x="745" y="522" font-size="12" fill="#065f46">VCC → 3V3, GND → GND</text>
+
+  <!-- LDR divider -->
+  <rect x="80" y="430" width="120" height="110" rx="6" fill="#fff7ed" stroke="#c2410c" stroke-width="2"/>
+  <text x="140" y="455" text-anchor="middle" font-weight="700" fill="#7c2d12">Делитель</text>
+  <text x="140" y="478" text-anchor="middle" font-size="12" fill="#7c2d12">3V3 → фоторезистор</text>
+  <text x="140" y="498" text-anchor="middle" font-size="12" fill="#7c2d12">→ точка → 10 кОм</text>
+  <text x="140" y="518" text-anchor="middle" font-size="12" fill="#7c2d12">→ GND</text>
+  <polyline points="500,486 515,486 515,560 140,560 140,540" fill="none" stroke="#c2410c" stroke-width="2"/>
+  <text x="300" y="555" font-size="12" fill="#c2410c">средняя точка → GPIO34 (ADC1)</text>
+
+  <text x="560" y="40" font-size="12" fill="#6b7280">Общая земля у всего обязательна.</text>
+  <text x="560" y="58" font-size="12" fill="#6b7280">Неиспользуемые OE у 74AHCT125 — на 5 В.</text>
+</svg>
