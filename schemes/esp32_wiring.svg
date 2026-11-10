@@ -1,7 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 620" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="14">
-  <title>Подсветка лестницы — подключение ESP32</title>
-  <rect width="1000" height="620" fill="#ffffff"/>
-  <text x="30" y="40" font-size="22" font-weight="700" fill="#1f2937">Подсветка лестницы — ESP32 + ESPHome</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 660" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="14">
+  <title>Подсветка лестницы — подключение Lolin S2 Mini</title>
+  <rect width="1000" height="660" fill="#ffffff"/>
+  <text x="30" y="40" font-size="22" font-weight="700" fill="#1f2937">Подсветка лестницы — Lolin S2 Mini + ESPHome</text>
   <text x="30" y="62" fill="#6b7280">11 ступенек × 24 WS2812B (5 В) · 2 × AM312 · фоторезистор</text>
 
   <!-- PSU -->
@@ -19,15 +19,16 @@
 
   <!-- ESP32 -->
   <rect x="300" y="240" width="200" height="300" rx="10" fill="#e0f2fe" stroke="#0369a1" stroke-width="2"/>
-  <text x="400" y="272" text-anchor="middle" font-weight="700" font-size="17" fill="#0c4a6e">ESP32 DevKit</text>
+  <text x="400" y="272" text-anchor="middle" font-weight="700" font-size="17" fill="#0c4a6e">Lolin S2 Mini</text>
+  <text x="400" y="527" text-anchor="middle" font-size="12" fill="#0c4a6e">ESP32-S2 · LED статуса GPIO15</text>
   <g fill="#0c4a6e">
-    <text x="312" y="310">5V / VIN</text>
+    <text x="312" y="310">VBUS (5V)</text>
     <text x="312" y="340">GND</text>
     <text x="312" y="370">3V3</text>
     <text x="488" y="400" text-anchor="end">GPIO16</text>
-    <text x="488" y="430" text-anchor="end">GPIO25</text>
-    <text x="488" y="460" text-anchor="end">GPIO26</text>
-    <text x="488" y="490" text-anchor="end">GPIO34</text>
+    <text x="488" y="430" text-anchor="end">GPIO33</text>
+    <text x="488" y="460" text-anchor="end">GPIO35</text>
+    <text x="488" y="490" text-anchor="end">GPIO3</text>
   </g>
   <!-- ESP power -->
   <polyline points="300,305 270,305 270,128" fill="none" stroke="#dc2626" stroke-width="2"/>
@@ -83,8 +84,8 @@
   <text x="140" y="498" text-anchor="middle" font-size="12" fill="#7c2d12">→ точка → 10 кОм</text>
   <text x="140" y="518" text-anchor="middle" font-size="12" fill="#7c2d12">→ GND</text>
   <polyline points="500,486 515,486 515,560 140,560 140,540" fill="none" stroke="#c2410c" stroke-width="2"/>
-  <text x="300" y="555" font-size="12" fill="#c2410c">средняя точка → GPIO34 (ADC1)</text>
+  <text x="300" y="555" font-size="12" fill="#c2410c">средняя точка → GPIO3 (ADC1)</text>
 
-  <text x="560" y="40" font-size="12" fill="#6b7280">Общая земля у всего обязательна.</text>
-  <text x="560" y="58" font-size="12" fill="#6b7280">Неиспользуемые OE у 74AHCT125 — на 5 В.</text>
+  <text x="30" y="628" font-size="12" fill="#6b7280">Общая земля у всего обязательна.</text>
+  <text x="30" y="646" font-size="12" fill="#6b7280">Неиспользуемые OE у 74AHCT125 — на 5 В. Не подключай USB при питании от БП.</text>
 </svg>

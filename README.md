@@ -8,7 +8,7 @@
 
 | | [ESPHome](esphome/) — **основная** | [Arduino](firmware/) — исходная |
 |---|---|---|
-| Контроллер | ESP32 (или ESP8266) | Arduino Nano |
+| Контроллер | Lolin S2 Mini (ESP32-S2), ESP32 или ESP8266 | Arduino Nano |
 | Home Assistant | датчики, свет, настройки, события | — |
 | Настройки | из HA, без перепрошивки | в коде, через перепрошивку |
 | Индикация (сигналы на лестницу из HA / Node-RED) | ✅ | — |
@@ -28,7 +28,7 @@
 
 👉 **[Документация, схема, установка и примеры](esphome/README.md)**
 
-![Схема подключения ESP32](schemes/esp32_wiring.svg)
+![Схема подключения S2 Mini](schemes/esp32_wiring.svg)
 
 Конфигурация под лестницу: 11 ступенек × 24 диода WS2812B (5 В). Под другую лестницу меняются две константы в `esphome/stairs_logic.h`.
 
@@ -113,7 +113,7 @@ Step steps[STEP_AMOUNT] = {
 ## Структура репозитория
 
 ```
-esphome/                ESPHome-версия (ESP32 / ESP8266)
+esphome/                ESPHome-версия (S2 Mini / ESP32 / ESP8266)
   stairs-led.yaml       конфиг устройства
   stairs_logic.h        движок: волна, эффекты, ночник, индикация
   secrets.example.yaml  какие секреты нужны
@@ -121,7 +121,7 @@ esphome/                ESPHome-версия (ESP32 / ESP8266)
   README.md             документация
 firmware/               Arduino-прошивки v1.0–v1.2
 libraries/              библиотеки для Arduino (microLED, FastLED, GyverButton)
-schemes/                схемы: scheme.jpg (Arduino), esp32_wiring.svg (ESP32)
+schemes/                схемы: scheme.jpg (Arduino), esp32_wiring.svg (S2 Mini)
 ```
 
 ## Авторы

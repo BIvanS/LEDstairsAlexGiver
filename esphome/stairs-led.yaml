@@ -1,6 +1,7 @@
 # =====================================================================
 #  Подсветка лестницы — ESPHome
 #  11 ступенек × 24 светодиода WS2812B (5 В), 2 датчика AM312, фоторезистор.
+#  Плата: Wemos/Lolin S2 Mini (ESP32-S2). Для ESP32 DevKit — см. README.
 #  Рядом с этим файлом должен лежать stairs_logic.h
 # =====================================================================
 
@@ -8,9 +9,10 @@ substitutions:
   name: stairs-led
   friendly_name: Лестница
   led_pin: GPIO16        # DATA ленты (через 74AHCT125)
-  pir_bottom_pin: GPIO25 # датчик «начало лестницы» (внизу)
-  pir_top_pin: GPIO26    # датчик «конец лестницы» (наверху)
-  ldr_pin: GPIO34        # фоторезистор (только ADC1: GPIO32–39)
+  pir_bottom_pin: GPIO33 # датчик «начало лестницы» (внизу)
+  pir_top_pin: GPIO35    # датчик «конец лестницы» (наверху)
+  ldr_pin: GPIO3         # фоторезистор (S2: только ADC1 = GPIO1–10)
+  adc_max: "2.5"         # верх шкалы АЦП, В (S2 при 12 дБ — 2.5; ESP32 — 3.3)
 
 esphome:
   name: ${name}
@@ -27,9 +29,14 @@ esphome:
           effect: Engine
 
 esp32:
-  board: esp32dev
+  board: lolin_s2_mini
+  variant: esp32s2
   framework:
     type: esp-idf
+
+# Синий светодиод на плате (GPIO15): мигает, если нет Wi-Fi или связи с HA
+status_led:
+  pin: GPIO15
 
 logger:
   level: INFO
@@ -73,6 +80,7 @@ light:
   # Физическая лента — скрыта от HA, ей управляет движок
   - platform: esp32_rmt_led_strip
     id: strip
+    rmt_symbols: 256   # вся память RMT у S2: S2 одноядерный, так меньше риск мерцания от Wi-Fi
     internal: true
     pin: ${led_pin}
     num_leds: 264
@@ -178,7 +186,7 @@ sensor:
     on_value:
       - sensor.template.publish:
           id: ldr_pct
-          state: !lambda 'return x / 3.3f * 100.0f;'
+          state: !lambda 'return x / ${adc_max}f * 100.0f;'
 
   - platform: template
     id: ldr_pct
@@ -269,7 +277,7 @@ number:
     min_value: 0
     max_value: 100
     step: 1
-    initial_value: 50
+    initial_value: 65   # ≈ старый NIGHT_PHOTO_MAX 500 из 1023 (1.6 В из 2.5)
     optimistic: true
     restore_value: true
     entity_category: config
