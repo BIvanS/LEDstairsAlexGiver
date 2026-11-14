@@ -63,8 +63,7 @@ api:
 
 ota:
   - platform: esphome
-    encryption:
-      key: !secret stairs_api_key
+    password: !secret ota_password
 
 wifi:
   ssid: !secret wifi_ssid
