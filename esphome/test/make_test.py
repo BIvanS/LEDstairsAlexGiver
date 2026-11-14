@@ -46,6 +46,9 @@ y = re.sub(r"ota:\n(?: {2,}.*\n)+", "", y)
 y = re.sub(r"wifi:\n(?: {2,}.*\n)+", "", y)
 y = y.replace("captive_portal:\n", "")
 y = re.sub(r"(?:# .*\n)?status_led:\n(?: {2}.*\n)+", "", y)
+# веб-интерфейс на платформе host не поддерживается — убираем
+y = re.sub(r"^(?:# .*\n)*web_server:\n(?: {2,}.*\n)+", "", y, flags=re.M)
+y = re.sub(r"^( +)web_server:\n(?:\1  .*\n)+", "", y, flags=re.M)
 y = y.replace("encryption:\n    key: !secret stairs_api_key\n", "")
 # физическая лента — убираем, кадры рисует interval ниже
 y = re.sub(r"  # Физическая лента.*?(?=  # То, что видно в HA)", "", y, flags=re.S)

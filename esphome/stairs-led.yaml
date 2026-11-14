@@ -74,6 +74,27 @@ wifi:
 
 captive_portal:
 
+# Веб-интерфейс прямо на плате: http://stairs-led.local или по IP.
+# local: true — страница целиком хранится в прошивке, интернет не нужен.
+web_server:
+  port: 80
+  version: 3
+  local: true
+  log: true
+  sorting_groups:
+    - id: grp_main
+      name: "Управление"
+      sorting_weight: 1
+    - id: grp_state
+      name: "Датчики"
+      sorting_weight: 2
+    - id: grp_settings
+      name: "Настройки"
+      sorting_weight: 3
+    - id: grp_service
+      name: "Сервис"
+      sorting_weight: 4
+
 # ------------------------- Лента -------------------------
 light:
   # Физическая лента — скрыта от HA, ей управляет движок
@@ -114,6 +135,9 @@ light:
   - platform: rgb
     id: stairs_light
     name: "Подсветка"
+    web_server:
+      sorting_group_id: grp_main
+      sorting_weight: 1
     icon: mdi:stairs
     red: out_r
     green: out_g
@@ -144,6 +168,9 @@ binary_sensor:
   - platform: gpio
     id: pir_bottom
     name: "Движение внизу"
+    web_server:
+      sorting_group_id: grp_state
+      sorting_weight: 1
     device_class: motion
     pin:
       number: ${pir_bottom_pin}
@@ -155,6 +182,9 @@ binary_sensor:
   - platform: gpio
     id: pir_top
     name: "Движение наверху"
+    web_server:
+      sorting_group_id: grp_state
+      sorting_weight: 2
     device_class: motion
     pin:
       number: ${pir_top_pin}
@@ -165,11 +195,17 @@ binary_sensor:
 
   - platform: template
     name: "Подсветка горит"
+    web_server:
+      sorting_group_id: grp_state
+      sorting_weight: 3
     icon: mdi:stairs-box
     lambda: 'return stairs::busy();'
 
   - platform: status
     name: "Статус"
+    web_server:
+      sorting_group_id: grp_service
+      sorting_weight: 1
 
 sensor:
   - platform: adc
@@ -190,6 +226,9 @@ sensor:
   - platform: template
     id: ldr_pct
     name: "Освещённость"
+    web_server:
+      sorting_group_id: grp_state
+      sorting_weight: 5
     unit_of_measurement: "%"
     icon: mdi:brightness-6
     accuracy_decimals: 0
@@ -200,6 +239,9 @@ sensor:
 
   - platform: wifi_signal
     name: "Wi-Fi сигнал"
+    web_server:
+      sorting_group_id: grp_service
+      sorting_weight: 2
     update_interval: 60s
     entity_category: diagnostic
 
@@ -207,6 +249,9 @@ event:
   - platform: template
     id: walk_event
     name: "Проход"
+    web_server:
+      sorting_group_id: grp_state
+      sorting_weight: 4
     icon: mdi:walk
     event_types:
       - up
@@ -215,6 +260,9 @@ event:
 text_sensor:
   - platform: template
     name: "Индикация"
+    web_server:
+      sorting_group_id: grp_state
+      sorting_weight: 6
     icon: mdi:message-alert
     update_interval: 1s
     lambda: 'return stairs::notify_name();'
@@ -224,6 +272,9 @@ select:
   - platform: template
     id: sel_effect
     name: "Эффект"
+    web_server:
+      sorting_group_id: grp_main
+      sorting_weight: 2
     icon: mdi:palette
     optimistic: true
     restore_value: true
@@ -238,18 +289,27 @@ switch:
   - platform: template
     id: sw_auto_motion
     name: "Включать по движению"
+    web_server:
+      sorting_group_id: grp_main
+      sorting_weight: 3
     icon: mdi:motion-sensor
     optimistic: true
     restore_mode: RESTORE_DEFAULT_ON
   - platform: template
     id: sw_night
     name: "Ночная подсветка"
+    web_server:
+      sorting_group_id: grp_main
+      sorting_weight: 4
     icon: mdi:weather-night
     optimistic: true
     restore_mode: RESTORE_DEFAULT_ON
   - platform: template
     id: sw_auto_bright
     name: "Автояркость"
+    web_server:
+      sorting_group_id: grp_settings
+      sorting_weight: 6
     icon: mdi:brightness-auto
     optimistic: true
     restore_mode: RESTORE_DEFAULT_ON
@@ -259,6 +319,9 @@ number:
   - platform: template
     id: num_timeout
     name: "Таймаут"
+    web_server:
+      sorting_group_id: grp_settings
+      sorting_weight: 1
     icon: mdi:timer-outline
     unit_of_measurement: s
     min_value: 5
@@ -271,6 +334,9 @@ number:
   - platform: template
     id: num_dark
     name: "Порог темноты"
+    web_server:
+      sorting_group_id: grp_settings
+      sorting_weight: 2
     icon: mdi:theme-light-dark
     unit_of_measurement: "%"
     min_value: 0
@@ -283,6 +349,9 @@ number:
   - platform: template
     id: num_night_bright
     name: "Яркость ночной подсветки"
+    web_server:
+      sorting_group_id: grp_settings
+      sorting_weight: 3
     icon: mdi:brightness-4
     unit_of_measurement: "%"
     min_value: 1
@@ -295,6 +364,9 @@ number:
   - platform: template
     id: num_step_delay
     name: "Шаг волны"
+    web_server:
+      sorting_group_id: grp_settings
+      sorting_weight: 4
     icon: mdi:stairs-up
     unit_of_measurement: ms
     min_value: 20
@@ -307,6 +379,9 @@ number:
   - platform: template
     id: num_fade
     name: "Плавность ступеньки"
+    web_server:
+      sorting_group_id: grp_settings
+      sorting_weight: 5
     icon: mdi:gradient-horizontal
     unit_of_measurement: ms
     min_value: 50
@@ -320,21 +395,33 @@ number:
 button:
   - platform: template
     name: "Тест: проход вверх"
+    web_server:
+      sorting_group_id: grp_settings
+      sorting_weight: 7
     icon: mdi:stairs-up
     entity_category: config
     on_press:
       - lambda: 'stairs::motion(1, true);'
   - platform: template
     name: "Тест: индикация"
+    web_server:
+      sorting_group_id: grp_settings
+      sorting_weight: 8
     icon: mdi:bell-ring
     entity_category: config
     on_press:
       - lambda: 'stairs::notify_start("pulse", 0, 120, 255, 70, 10, 0);'
   - platform: template
     name: "Стоп индикации"
+    web_server:
+      sorting_group_id: grp_main
+      sorting_weight: 5
     icon: mdi:bell-off
     on_press:
       - lambda: 'stairs::notify_stop();'
   - platform: restart
     name: "Перезагрузка"
+    web_server:
+      sorting_group_id: grp_service
+      sorting_weight: 3
     entity_category: diagnostic
