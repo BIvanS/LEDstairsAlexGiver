@@ -84,7 +84,7 @@ light:
     pin: ${led_pin}
     num_leds: 264
     chipset: WS2812
-    channel_colors: GRB
+    rgb_order: GRB
     restore_mode: ALWAYS_ON
     default_transition_length: 0s
     effects:
