@@ -140,7 +140,6 @@ static bool motion(int8_t dir, bool force = false) {
 }
 
 static bool busy() { return walk_on; }
-static const char *direction_name() { return direction > 0 ? "up" : "down"; }
 
 static void notify_start(const std::string &pattern, int r, int g, int b, int brightness, int duration_s,
                          int value) {
