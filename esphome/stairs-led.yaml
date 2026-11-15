@@ -13,20 +13,16 @@ substitutions:
   pir_top_pin: GPIO35    # датчик «конец лестницы» (наверху)
   ldr_pin: GPIO3         # фоторезистор (S2: только ADC1 = GPIO1–10)
   adc_max: "2.5"         # верх шкалы АЦП, В (S2 при 12 дБ — 2.5; ESP32 — 3.3)
+  power_pin: GPIO18      # затвор полевика, который включает питание ленты
+  power_inverted: "false" # "true", если полевик открывается низким уровнем (P-канал без драйвера)
+  latitude: "40.21°"     # координаты дома — для расчёта заката и рассвета
+  longitude: "-75.01°"
 
 esphome:
   name: ${name}
   friendly_name: ${friendly_name}
   includes:
     - stairs_logic.h
-  on_boot:
-    priority: -100
-    then:
-      # Внутренняя лента всегда включена, кадры рисует наш движок
-      - light.turn_on:
-          id: strip
-          brightness: 100%
-          effect: Engine
 
 esp32:
   board: lolin_s2_mini
@@ -74,6 +70,108 @@ wifi:
 
 captive_portal:
 
+# ------------------------- Время и солнце -------------------------
+# Время берётся у Home Assistant (без интернета). Пока времени нет
+# (HA недоступен после включения), «вечернее окно» считается открытым
+# и работает только фоторезистор — как в старой прошивке.
+time:
+  - platform: homeassistant
+    id: ha_time
+
+sun:
+  id: sun_c
+  latitude: ${latitude}
+  longitude: ${longitude}
+
+globals:
+  - id: power_on
+    type: bool
+    initial_value: 'false'
+
+interval:
+  # Настройки из HA → движок, плюс такт движка (работает и без питания ленты)
+  - interval: 100ms
+    then:
+      - lambda: |-
+          auto &v = id(stairs_light).current_values;
+          stairs::cur.enabled = v.is_on();
+          stairs::cur.color = Color(v.get_red() * 255, v.get_green() * 255, v.get_blue() * 255);
+          stairs::cur.bright = v.get_brightness();
+          stairs::cur.auto_motion = id(sw_auto_motion).state;
+          stairs::cur.night = id(sw_night).state;
+          stairs::cur.auto_bright = id(sw_auto_bright).state;
+          stairs::cur.sensor_high = id(pir_bottom).state || id(pir_top).state;
+          stairs::cur.light_pct = isnan(id(ldr_pct).state) ? 0 : id(ldr_pct).state;
+          stairs::cur.dark_threshold = id(num_dark).state;
+          stairs::cur.night_bright = id(num_night_bright).state / 100.0f;
+          stairs::cur.timeout_ms = id(num_timeout).state * 1000;
+          stairs::cur.step_delay_ms = id(num_step_delay).state;
+          stairs::cur.fade_ms = id(num_fade).state;
+          stairs::cur.effect_mode = id(sel_effect).active_index().value_or(0);
+          stairs::tick();
+
+  # >>> sun-window
+  # «Вечернее окно»: от (закат − N мин) до (рассвет + M мин)
+  - interval: 10s
+    then:
+      - lambda: |-
+          bool win = true;
+          std::string on_s = "—", off_s = "—";
+          auto t = id(ha_time).now();
+          auto ss = id(sun_c).sunset(-0.833);
+          auto sr = id(sun_c).sunrise(-0.833);
+          if (t.is_valid() && ss.has_value() && sr.has_value()) {
+            time_t on_ts = ss.value().timestamp - (time_t) (id(num_on_offset).state * 60);
+            time_t off_ts = sr.value().timestamp + (time_t) (id(num_off_offset).state * 60);
+            on_s = ESPTime::from_epoch_local(on_ts).strftime("%H:%M");
+            off_s = ESPTime::from_epoch_local(off_ts).strftime("%H:%M");
+            if (id(sw_evening).state) win = t.timestamp >= on_ts || t.timestamp < off_ts;
+          }
+          stairs::cur.in_window = win;
+          if (id(txt_on_time).state != on_s) id(txt_on_time).publish_state(on_s);
+          if (id(txt_off_time).state != off_s) id(txt_off_time).publish_state(off_s);
+  # <<< sun-window
+
+  # >>> power
+  # Питание ленты. Включение: полевик → 50 мс → кадры. Выключение: гасим ленту
+  # и останавливаем кадры → 200 мс → полевик. Так в обесточенную ленту не идут
+  # данные (иначе она подпитывается через DIN).
+  - interval: 20ms
+    then:
+      - lambda: |-
+          static uint32_t idle_since = 0, t_on = 0, t_off = 0;
+          uint32_t now = millis();
+          int mode = id(sel_power).active_index().value_or(0);  // 0 авто, 1 вкл, 2 выкл
+          bool need = mode == 1 || (mode == 0 && stairs::needs_output());
+          if (need) idle_since = now;
+          bool want = need || (id(power_on) && now - idle_since < (uint32_t) (id(num_power_hold).state * 1000));
+          if (mode == 2) want = false;
+          auto *ls = id(strip);
+          if (want) {
+            if (!id(power_on)) {
+              id(strip_power).turn_on();
+              id(power_on) = true;
+              t_on = now;
+            } else if (!ls->remote_values.is_on() && now - t_on >= 50) {
+              auto c = ls->turn_on();
+              c.set_brightness(1.0f);
+              c.set_transition_length(0);
+              c.set_effect("Engine");
+              c.perform();
+            }
+          } else if (id(power_on)) {
+            if (ls->remote_values.is_on()) {
+              auto c = ls->turn_off();
+              c.set_transition_length(0);
+              c.perform();
+              t_off = now;
+            } else if (now - t_off >= 200) {
+              id(strip_power).turn_off();
+              id(power_on) = false;
+            }
+          }
+  # <<< power
+
 # Веб-интерфейс прямо на плате: http://stairs-led.local или по IP.
 # local: true — страница целиком хранится в прошивке, интернет не нужен.
 web_server:
@@ -106,28 +204,14 @@ light:
     num_leds: 264
     chipset: WS2812
     rgb_order: GRB
-    restore_mode: ALWAYS_ON
+    # Включается и выключается вместе с полевиком (см. «Питание ленты» ниже)
+    restore_mode: ALWAYS_OFF
     default_transition_length: 0s
     effects:
       - addressable_lambda:
           name: Engine
           update_interval: 20ms
           lambda: |-
-            auto &v = id(stairs_light).current_values;
-            stairs::cur.enabled = v.is_on();
-            stairs::cur.color = Color(v.get_red() * 255, v.get_green() * 255, v.get_blue() * 255);
-            stairs::cur.bright = v.get_brightness();
-            stairs::cur.auto_motion = id(sw_auto_motion).state;
-            stairs::cur.night = id(sw_night).state;
-            stairs::cur.auto_bright = id(sw_auto_bright).state;
-            stairs::cur.sensor_high = id(pir_bottom).state || id(pir_top).state;
-            stairs::cur.light_pct = isnan(id(ldr_pct).state) ? 0 : id(ldr_pct).state;
-            stairs::cur.dark_threshold = id(num_dark).state;
-            stairs::cur.night_bright = id(num_night_bright).state / 100.0f;
-            stairs::cur.timeout_ms = id(num_timeout).state * 1000;
-            stairs::cur.step_delay_ms = id(num_step_delay).state;
-            stairs::cur.fade_ms = id(num_fade).state;
-            stairs::cur.effect_mode = id(sel_effect).active_index().value_or(0);
             stairs::render(it);
 
   # То, что видно в HA: вкл/выкл подсветки, цвет и яркость прохода.
@@ -147,6 +231,12 @@ light:
     restore_mode: RESTORE_DEFAULT_ON
 
 output:
+  # Полевик питания ленты
+  - platform: gpio
+    id: strip_power
+    pin:
+      number: ${power_pin}
+      inverted: ${power_inverted}
   - platform: template
     id: out_r
     type: float
@@ -200,6 +290,22 @@ binary_sensor:
       sorting_weight: 3
     icon: mdi:stairs-box
     lambda: 'return stairs::busy();'
+
+  - platform: template
+    name: "Питание ленты"
+    web_server:
+      sorting_group_id: grp_state
+      sorting_weight: 7
+    device_class: power
+    lambda: 'return id(power_on);'
+
+  - platform: template
+    name: "Сейчас вечер"
+    web_server:
+      sorting_group_id: grp_state
+      sorting_weight: 8
+    icon: mdi:weather-sunset
+    lambda: 'return stairs::cur.in_window;'
 
   - platform: status
     name: "Статус"
@@ -259,6 +365,20 @@ event:
 
 text_sensor:
   - platform: template
+    id: txt_on_time
+    name: "Включение сегодня"
+    web_server:
+      sorting_group_id: grp_state
+      sorting_weight: 9
+    icon: mdi:weather-sunset-down
+  - platform: template
+    id: txt_off_time
+    name: "Выключение утром"
+    web_server:
+      sorting_group_id: grp_state
+      sorting_weight: 10
+    icon: mdi:weather-sunset-up
+  - platform: template
     name: "Индикация"
     web_server:
       sorting_group_id: grp_state
@@ -284,8 +404,31 @@ select:
       - "Огонь"
       - "По очереди"
     initial_option: "По очереди"
+  - platform: template
+    id: sel_power
+    name: "Питание ленты (режим)"
+    web_server:
+      sorting_group_id: grp_main
+      sorting_weight: 7
+    icon: mdi:power-plug
+    optimistic: true
+    restore_value: true
+    options:
+      - "Авто"
+      - "Всегда включено"
+      - "Выключено"
+    initial_option: "Авто"
 
 switch:
+  - platform: template
+    id: sw_evening
+    name: "Только вечером"
+    web_server:
+      sorting_group_id: grp_main
+      sorting_weight: 6
+    icon: mdi:weather-night
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
   - platform: template
     id: sw_auto_motion
     name: "Включать по движению"
@@ -316,6 +459,51 @@ switch:
     entity_category: config
 
 number:
+  - platform: template
+    id: num_on_offset
+    name: "Включать до заката"
+    web_server:
+      sorting_group_id: grp_settings
+      sorting_weight: 20
+    icon: mdi:weather-sunset-down
+    unit_of_measurement: min
+    min_value: -120
+    max_value: 240
+    step: 5
+    initial_value: 30
+    optimistic: true
+    restore_value: true
+    entity_category: config
+  - platform: template
+    id: num_off_offset
+    name: "Гасить после рассвета"
+    web_server:
+      sorting_group_id: grp_settings
+      sorting_weight: 21
+    icon: mdi:weather-sunset-up
+    unit_of_measurement: min
+    min_value: -120
+    max_value: 240
+    step: 5
+    initial_value: 30
+    optimistic: true
+    restore_value: true
+    entity_category: config
+  - platform: template
+    id: num_power_hold
+    name: "Задержка снятия питания"
+    web_server:
+      sorting_group_id: grp_settings
+      sorting_weight: 22
+    icon: mdi:timer-sand
+    unit_of_measurement: s
+    min_value: 5
+    max_value: 600
+    step: 5
+    initial_value: 30
+    optimistic: true
+    restore_value: true
+    entity_category: config
   - platform: template
     id: num_timeout
     name: "Таймаут"

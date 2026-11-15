@@ -3,6 +3,10 @@
 //  Перенос проекта AlexGyver LEDstairs (Arduino Nano) на ESP32/ESP8266.
 //  Вся логика работает на самом контроллере — без HA, Wi-Fi и брокера.
 //
+//  Питание ленты: полевой транзистор включается, только когда есть что
+//  показывать (см. needs_output). Днём, вне «вечернего окна», лента
+//  обесточена.
+//
 //  Слои отрисовки (сверху вниз по приоритету):
 //    1. Проход по лестнице  — волна по ступенькам (безопасность важнее всего)
 //    2. Индикация           — сигналы из HA / Node-RED (action notify)
@@ -33,6 +37,7 @@ struct Settings {
   bool night = true;          // ночная подсветка
   bool auto_bright = true;    // автояркость по фоторезистору
   bool sensor_high = false;   // один из PIR сейчас в состоянии «движение»
+  bool in_window = true;      // сейчас «вечернее окно» (от заката до рассвета ± сдвиг)
   Color color = Color(255, 255, 255);
   float bright = 1.0f;        // яркость основного света 0..1
   float light_pct = 0.0f;     // освещённость с фоторезистора, %
@@ -121,7 +126,7 @@ static bool motion(int8_t dir, bool force = false) {
   if (!initialized) init();
   uint32_t now = millis();
   last_motion = now;
-  bool allowed = force || (cur.enabled && cur.auto_motion && is_dark);
+  bool allowed = force || (cur.enabled && cur.auto_motion && is_dark && cur.in_window);
   if (!allowed || walk_on) return false;
   direction = dir;
   if (cur.effect_mode == 3) {
@@ -231,6 +236,27 @@ static Color night_color(int step, int j) {
   return scale(Color(255, 255, 255), cur.night_bright);
 }
 
+// ---------- Такт без отрисовки: работает и когда лента обесточена ----------
+static void tick() {
+  if (!initialized) init();
+  // Темно/светло с гистерезисом 5 %
+  if (is_dark && cur.light_pct > cur.dark_threshold + 5) is_dark = false;
+  else if (!is_dark && cur.light_pct < cur.dark_threshold) is_dark = true;
+  // Индикация с истёкшим сроком
+  if (ntf.active && ntf.until && (int32_t) (millis() - ntf.until) >= 0) ntf.active = false;
+}
+
+static bool night_visible() { return cur.enabled && cur.night && is_dark && cur.in_window; }
+
+// Есть ли сейчас что показывать — по этому включается полевик ленты
+static bool needs_output() {
+  if (!initialized) init();
+  if (walk_on || ntf.active || night_visible()) return true;
+  for (int s = 0; s < STEPS; s++)
+    if (level[s] > 0 || sched_target[s] >= 0) return true;
+  return false;
+}
+
 // ---------- Главный кадр (вызывается эффектом addressable_lambda) ----------
 static void render(AddressableLight &it) {
   if (!initialized) init();
@@ -239,9 +265,7 @@ static void render(AddressableLight &it) {
   last_frame = now;
   if (dt > 100) dt = 100;
 
-  // Темно/светло с гистерезисом 5 %
-  if (is_dark && cur.light_pct > cur.dark_threshold + 5) is_dark = false;
-  else if (!is_dark && cur.light_pct < cur.dark_threshold) is_dark = true;
+  tick();
 
   // Человек всё ещё стоит под датчиком — продлеваем
   if (walk_on && cur.sensor_high) last_motion = now;
@@ -275,15 +299,12 @@ static void render(AddressableLight &it) {
     night_mask = ((night_mask >> 1) | ((night_mask & 1) << (LEDS_PER_STEP - 1))) & 0xFFFFFF;
   }
 
-  // Срок индикации истёк
-  if (ntf.active && ntf.until && (int32_t) (now - ntf.until) >= 0) ntf.active = false;
-
   // Яркость прохода (автояркость: темнее в комнате — тусклее лестница, как в оригинале)
   float walk_bright = cur.bright;
   if (cur.auto_bright && cur.dark_threshold > 0)
     walk_bright *= 0.3f + 0.7f * clamp01(cur.light_pct / cur.dark_threshold);
 
-  bool show_night = cur.enabled && cur.night && is_dark;
+  bool show_night = night_visible();
 
   for (int s = 0; s < STEPS; s++) {
     for (int j = 0; j < LEDS_PER_STEP; j++) {

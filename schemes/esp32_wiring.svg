@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 660" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="14">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 700" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="14">
   <title>Подсветка лестницы — подключение Lolin S2 Mini</title>
-  <rect width="1000" height="660" fill="#ffffff"/>
+  <rect width="1000" height="700" fill="#ffffff"/>
   <text x="30" y="40" font-size="22" font-weight="700" fill="#1f2937">Подсветка лестницы — Lolin S2 Mini + ESPHome</text>
   <text x="30" y="62" fill="#6b7280">11 ступенек × 24 WS2812B (5 В) · 2 × AM312 · фоторезистор</text>
 
@@ -18,9 +18,9 @@
   <text x="900" y="162" fill="#111827">GND</text>
 
   <!-- ESP32 -->
-  <rect x="300" y="240" width="200" height="300" rx="10" fill="#e0f2fe" stroke="#0369a1" stroke-width="2"/>
+  <rect x="300" y="240" width="200" height="345" rx="10" fill="#e0f2fe" stroke="#0369a1" stroke-width="2"/>
   <text x="400" y="272" text-anchor="middle" font-weight="700" font-size="17" fill="#0c4a6e">Lolin S2 Mini</text>
-  <text x="400" y="527" text-anchor="middle" font-size="12" fill="#0c4a6e">ESP32-S2 · LED статуса GPIO15</text>
+  <text x="400" y="575" text-anchor="middle" font-size="12" fill="#0c4a6e">ESP32-S2 · LED статуса GPIO15</text>
   <g fill="#0c4a6e">
     <text x="312" y="310">VBUS (5V)</text>
     <text x="312" y="340">GND</text>
@@ -29,6 +29,7 @@
     <text x="488" y="430" text-anchor="end">GPIO33</text>
     <text x="488" y="460" text-anchor="end">GPIO35</text>
     <text x="488" y="490" text-anchor="end">GPIO3</text>
+    <text x="488" y="560" text-anchor="end">GPIO18</text>
   </g>
   <!-- ESP power -->
   <polyline points="300,305 270,305 270,128" fill="none" stroke="#dc2626" stroke-width="2"/>
@@ -36,8 +37,8 @@
   <polyline points="300,335 250,335 250,170" fill="none" stroke="#111827" stroke-width="2"/>
   <circle cx="250" cy="170" r="4" fill="#111827"/>
   <!-- 3V3 rail -->
-  <polyline points="300,365 230,365 230,580 940,580" fill="none" stroke="#ea580c" stroke-width="2" stroke-dasharray="6 4"/>
-  <text x="240" y="598" fill="#ea580c">3V3 — питание датчиков и делителя</text>
+  <polyline points="300,365 230,365 230,620 940,620" fill="none" stroke="#ea580c" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="240" y="638" fill="#ea580c">3V3 — питание датчиков и делителя</text>
 
   <!-- Level shifter -->
   <rect x="560" y="370" width="150" height="60" rx="6" fill="#fef3c7" stroke="#b45309" stroke-width="2"/>
@@ -83,9 +84,16 @@
   <text x="140" y="478" text-anchor="middle" font-size="12" fill="#7c2d12">3V3 → фоторезистор</text>
   <text x="140" y="498" text-anchor="middle" font-size="12" fill="#7c2d12">→ точка → 10 кОм</text>
   <text x="140" y="518" text-anchor="middle" font-size="12" fill="#7c2d12">→ GND</text>
-  <polyline points="500,486 515,486 515,560 140,560 140,540" fill="none" stroke="#c2410c" stroke-width="2"/>
-  <text x="300" y="555" font-size="12" fill="#c2410c">средняя точка → GPIO3 (ADC1)</text>
+  <polyline points="500,486 515,486 515,598 140,598 140,540" fill="none" stroke="#c2410c" stroke-width="2"/>
+  <text x="250" y="612" font-size="12" fill="#c2410c">средняя точка → GPIO3 (ADC1)</text>
 
-  <text x="30" y="628" font-size="12" fill="#6b7280">Общая земля у всего обязательна.</text>
-  <text x="30" y="646" font-size="12" fill="#6b7280">Неиспользуемые OE у 74AHCT125 — на 5 В. Не подключай USB при питании от БП.</text>
+  <text x="30" y="668" font-size="12" fill="#6b7280">Общая земля у всего обязательна.</text>
+  <text x="30" y="686" font-size="12" fill="#6b7280">Неиспользуемые OE у 74AHCT125 — на 5 В. Не подключай USB при питании от БП.</text>
+  <!-- MOSFET -->
+  <line x1="500" y1="555" x2="760" y2="555" stroke="#be123c" stroke-width="2"/>
+  <rect x="760" y="538" width="210" height="46" rx="6" fill="#fff1f2" stroke="#be123c" stroke-width="2"/>
+  <text x="865" y="557" text-anchor="middle" font-weight="700" fill="#881337">Полевик — питание ленты</text>
+  <text x="865" y="575" text-anchor="middle" font-size="12" fill="#881337">GPIO18 → затвор</text>
+  <polyline points="955,538 955,430" fill="none" stroke="#be123c" stroke-width="2" stroke-dasharray="5 3"/>
+  <text x="948" y="505" text-anchor="end" font-size="12" fill="#be123c">в разрыв питания ленты</text>
 </svg>
