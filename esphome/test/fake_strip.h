@@ -2,6 +2,9 @@
 #include "esphome.h"
 #include <cstdio>
 #include <cstdlib>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 // Тестовая «лента» в памяти, чтобы прогнать движок на ПК
 class FakeStrip : public esphome::light::AddressableLight {
@@ -39,4 +42,18 @@ static void dump(const char *label) {
   for (int s = 0; s < 11; s++) printf("%4d", step_sum(s));
   printf("\n");
   fflush(stdout);
+}
+
+// Один канал диода (0 R, 1 G, 2 B)
+static int px(int s, int j, int c) { return fake.buf[(s * 24 + j) * 3 + c]; }
+
+// Пакет «как от Hyperion» (UDP Raw) на свой же порт
+static void udp_send_local(int port, const uint8_t *d, size_t n) {
+  static int fd = -1;
+  if (fd < 0) fd = ::socket(AF_INET, SOCK_DGRAM, 0);
+  sockaddr_in a{};
+  a.sin_family = AF_INET;
+  a.sin_port = htons(port);
+  a.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+  ::sendto(fd, d, n, 0, (sockaddr *) &a, sizeof(a));
 }

@@ -17,6 +17,7 @@ substitutions:
   power_inverted: "false" # "true", если полевик открывается низким уровнем (P-канал без драйвера)
   latitude: "40.21°"     # координаты дома — для расчёта заката и рассвета
   longitude: "-75.01°"
+  ambilight_port: "5568" # UDP-порт для Hyperion (устройство «UDP Raw», порт по умолчанию 5568)
 
 esphome:
   name: ${name}
@@ -70,6 +71,16 @@ wifi:
 
 captive_portal:
 
+# ------------------------- Ambilight от Hyperion -------------------------
+# Hyperion шлёт сюда цвета по протоколу «UDP Raw»: байты R,G,B подряд.
+# В Hyperion: отдельный экземпляр, устройство UDP Raw, адрес лестницы,
+# порт ${ambilight_port}, 11 светодиодов (по одному на ступеньку). См. README.
+udp:
+  id: ambilight_udp
+  port: ${ambilight_port}
+  on_receive:
+    - lambda: 'stairs::ambi_frame(data.data(), data.size());'
+
 # ------------------------- Время и солнце -------------------------
 # Время берётся у Home Assistant (без интернета). Пока времени нет
 # (HA недоступен после включения), «вечернее окно» считается открытым
@@ -108,6 +119,9 @@ interval:
           stairs::cur.step_delay_ms = id(num_step_delay).state;
           stairs::cur.fade_ms = id(num_fade).state;
           stairs::cur.effect_mode = id(sel_effect).active_index().value_or(0);
+          stairs::cur.ambi_enabled = id(sw_ambi).state;
+          stairs::cur.ambi_evening_only = id(sw_ambi_evening).state;
+          stairs::cur.ambi_bright = id(num_ambi_bright).state / 100.0f;
           stairs::tick();
 
   # >>> sun-window
@@ -307,6 +321,14 @@ binary_sensor:
     icon: mdi:weather-sunset
     lambda: 'return stairs::cur.in_window;'
 
+  - platform: template
+    name: "Ambilight принимается"
+    web_server:
+      sorting_group_id: grp_state
+      sorting_weight: 11
+    icon: mdi:television-ambient-light
+    lambda: 'return stairs::ambi_receiving();'
+
   - platform: status
     name: "Статус"
     web_server:
@@ -350,6 +372,18 @@ sensor:
       sorting_weight: 2
     update_interval: 60s
     entity_category: diagnostic
+
+  # Сколько цветов в пакете от Hyperion — проверка настройки (ждём 11)
+  - platform: template
+    name: "Ambilight: цветов в пакете"
+    web_server:
+      sorting_group_id: grp_service
+      sorting_weight: 4
+    icon: mdi:counter
+    accuracy_decimals: 0
+    update_interval: 5s
+    entity_category: diagnostic
+    lambda: 'return stairs::ambi_count;'
 
 event:
   - platform: template
@@ -454,6 +488,25 @@ switch:
       sorting_group_id: grp_settings
       sorting_weight: 6
     icon: mdi:brightness-auto
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+    entity_category: config
+  - platform: template
+    id: sw_ambi
+    name: "Ambilight"
+    web_server:
+      sorting_group_id: grp_main
+      sorting_weight: 8
+    icon: mdi:television-ambient-light
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+  - platform: template
+    id: sw_ambi_evening
+    name: "Ambilight только вечером"
+    web_server:
+      sorting_group_id: grp_settings
+      sorting_weight: 23
+    icon: mdi:weather-night
     optimistic: true
     restore_mode: RESTORE_DEFAULT_ON
     entity_category: config
@@ -576,6 +629,22 @@ number:
     max_value: 2000
     step: 50
     initial_value: 400
+    optimistic: true
+    restore_value: true
+    entity_category: config
+
+  - platform: template
+    id: num_ambi_bright
+    name: "Яркость Ambilight"
+    web_server:
+      sorting_group_id: grp_settings
+      sorting_weight: 24
+    icon: mdi:brightness-6
+    unit_of_measurement: "%"
+    min_value: 5
+    max_value: 100
+    step: 5
+    initial_value: 70
     optimistic: true
     restore_value: true
     entity_category: config

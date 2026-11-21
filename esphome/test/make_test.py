@@ -130,6 +130,40 @@ scenario = r"""
             stairs::notify_start("pulse", 0, 0, 255, 50, 2, 0); }
           if (phase == 13 && t > 57500) { phase = 14;
             check(stairs::needs_output() && id(power_on) && id(strip)->remote_values.is_on(), "индикация включает полевик и вне окна");
+            stairs::notify_stop(); stairs::cur.in_window = true; id(test_ldr_v) = 2.5f; }
+
+          // ---- Ambilight: пакеты UDP Raw от «Hyperion» (11 цветов, ступенька 0 — чёрная) ----
+          static bool feed = false;
+          static uint32_t last_feed = 0;
+          if (phase == 14) { feed = true; phase = 15; }
+          if (feed && millis() - last_feed >= 200) {
+            last_feed = millis();
+            uint8_t pkt[33];
+            for (int s = 0; s < 11; s++) { pkt[s * 3] = 100; pkt[s * 3 + 1] = (uint8_t) (s * 20); pkt[s * 3 + 2] = 200; }
+            pkt[0] = pkt[1] = pkt[2] = 0;
+            udp_send_local(${ambilight_port}, pkt, sizeof(pkt));
+          }
+          if (phase == 15 && t > 63500) { phase = 16; dump("Ambilight, светло");
+            check(stairs::ambi_count == 11 && stairs::ambi_receiving(), "пакеты по UDP приняты, 11 цветов");
+            check(abs(px(3, 5, 0) - 70) <= 2 && abs(px(3, 5, 1) - 42) <= 2 && abs(px(3, 5, 2) - 140) <= 2, "цвет ступеньки 3 = (100,60,200) × 70 %");
+            check(step_sum(0) == 0, "чёрный участок — тёмная ступенька (ночника днём нет)");
+            check(stairs::needs_output() && id(power_on), "Ambilight включает полевик");
+            id(test_ldr_v) = 0.66f; }
+          if (phase == 16 && t > 69500) { phase = 17; dump("Ambilight, темно");
+            check(step_sum(0) > 0 && step_sum(3) > 0, "на чёрном участке виден ночник");
+            auto ec = id(sel_effect).make_call(); ec.set_option("Огонь"); ec.perform();
+            id(pir_bottom).publish_state(true); }
+          if (phase == 17 && t > 71000) { phase = 18; id(pir_bottom).publish_state(false); dump("проход (огонь) поверх Ambilight");
+            check(stairs::busy() && px(1, 5, 2) < 100 && px(1, 5, 0) > 40, "проход рисуется поверх Ambilight"); }
+          if (phase == 18 && t > 90000) { phase = 19; stairs::cur.in_window = false; }
+          if (phase == 19 && t > 90200) { phase = 20; dump("Ambilight вне вечера");
+            check(!stairs::ambi_active() && step_sum(3) == 0, "«только вечером»: днём Ambilight не показывается");
+            id(sw_ambi_evening).turn_off(); }
+          if (phase == 20 && t > 90500) { phase = 21; dump("Ambilight и днём");
+            check(stairs::ambi_active() && step_sum(3) > 0, "«только вечером» выключен — Ambilight и днём");
+            stairs::cur.in_window = true; feed = false; }
+          if (phase == 21 && t > 94500) { phase = 22; dump("Hyperion замолчал");
+            check(!stairs::ambi_receiving() && step_sum(3) == 0 && step_sum(0) > 0, "через 3 с без пакетов — обратно ночник");
             printf(fails ? "%d FAILED\n" : "ALL PASSED\n", fails); exit(fails ? 1 : 0); }
 """
 

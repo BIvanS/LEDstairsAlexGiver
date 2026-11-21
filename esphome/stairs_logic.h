@@ -10,8 +10,10 @@
 //  Слои отрисовки (сверху вниз по приоритету):
 //    1. Проход по лестнице  — волна по ступенькам (безопасность важнее всего)
 //    2. Индикация           — сигналы из HA / Node-RED (action notify)
-//    3. Ночная подсветка    — крайние ступеньки, когда темно
-//    4. Темнота
+//    3. Ambilight           — цвета с экрана телевизора от Hyperion (UDP raw)
+//    4. Ночная подсветка    — крайние ступеньки, когда темно; видна там,
+//                             где Ambilight чёрный
+//    5. Темнота
 // =====================================================================
 #pragma once
 #include "esphome.h"
@@ -47,6 +49,11 @@ struct Settings {
   uint32_t timeout_ms = 15000;
   uint32_t step_delay_ms = 150;
   uint32_t fade_ms = 400;
+  // Ambilight
+  bool ambi_enabled = true;       // принимать картинку от Hyperion
+  bool ambi_evening_only = true;  // только в «вечернем окне»
+  float ambi_bright = 0.7f;       // яркость Ambilight 0..1
+  uint32_t ambi_timeout_ms = 3000;  // нет пакетов дольше — Ambilight выключен
 };
 static Settings cur;
 
@@ -84,6 +91,36 @@ struct Notify {
   int32_t value = 0;    // level: 0..100 %, steps: битовая маска ступенек
 };
 static Notify ntf;
+
+// ---------- Ambilight (Hyperion → UDP raw) ----------
+// Пакет — просто байты R,G,B подряд, без заголовка (устройство «UDP Raw» в Hyperion).
+// Сколько цветов пришло, столько участков и будет: 11 — по цвету на ступеньку,
+// 22 — левая и правая половины ступеньки и т. д. Ступенька 0 — первый цвет.
+// В один пакет ESPHome принимает до 508 байт, то есть не больше 169 цветов.
+static Color ambi[NUM_LEDS];
+static uint32_t ambi_last = 0;     // когда пришёл последний пакет
+static bool ambi_got = false;      // пакеты вообще были
+static uint16_t ambi_count = 0;    // цветов в последнем пакете
+static uint32_t ambi_packets = 0;  // счётчик пакетов (для диагностики)
+
+static void ambi_frame(const uint8_t *data, size_t len) {
+  size_t n = len / 3;
+  if (n == 0) return;
+  for (int i = 0; i < NUM_LEDS; i++) {
+    size_t k = (size_t) i * n / NUM_LEDS;
+    ambi[i] = Color(data[k * 3], data[k * 3 + 1], data[k * 3 + 2]);
+  }
+  ambi_count = (uint16_t) n;
+  ambi_last = millis();
+  ambi_got = true;
+  ambi_packets++;
+}
+// Пакеты идут прямо сейчас (Hyperion работает и шлёт на лестницу)
+static bool ambi_receiving() { return ambi_got && millis() - ambi_last < cur.ambi_timeout_ms; }
+// Ambilight показывается на лестнице
+static bool ambi_active() {
+  return cur.enabled && cur.ambi_enabled && ambi_receiving() && (!cur.ambi_evening_only || cur.in_window);
+}
 
 // ---------- Вспомогательное ----------
 static inline float clamp01(float v) { return v < 0 ? 0 : (v > 1 ? 1 : v); }
@@ -250,7 +287,7 @@ static bool night_visible() { return cur.enabled && cur.night && is_dark && cur.
 // Есть ли сейчас что показывать — по этому включается полевик ленты
 static bool needs_output() {
   if (!initialized) init();
-  if (walk_on || ntf.active || night_visible()) return true;
+  if (walk_on || ntf.active || ambi_active() || night_visible()) return true;
   for (int s = 0; s < STEPS; s++)
     if (level[s] > 0 || sched_target[s] >= 0) return true;
   return false;
@@ -304,12 +341,20 @@ static void render(AddressableLight &it) {
     walk_bright *= 0.3f + 0.7f * clamp01(cur.light_pct / cur.dark_threshold);
 
   bool show_night = night_visible();
+  bool show_ambi = ambi_active();
 
   for (int s = 0; s < STEPS; s++) {
     for (int j = 0; j < LEDS_PER_STEP; j++) {
       Color bg(0, 0, 0);
-      if (ntf.active) bg = notify_color(s, j, now);
-      else if (show_night) bg = night_color(s, j);
+      if (ntf.active) {
+        bg = notify_color(s, j, now);
+      } else {
+        if (show_night) bg = night_color(s, j);
+        if (show_ambi) {
+          Color a = scale(ambi[led_index(s, j)], cur.ambi_bright);
+          if (a.r | a.g | a.b) bg = a;  // на чёрном экране остаётся ночник
+        }
+      }
       Color out = bg;
       if (level[s] > 0) out = mix(bg, scale(walk_color(s, j), walk_bright), level[s]);
       it[led_index(s, j)] = out;
